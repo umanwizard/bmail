@@ -25,10 +25,9 @@ use nom::sequence::tuple;
 use nom::Err;
 use nom::IResult;
 
-use crate::email;
-use email::btv_new::{ByteStr, ByteString};
-use email::error::EmailError;
-use email::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
+use crate::btv_new::{ByteStr, ByteString};
+use crate::error::EmailError;
+use crate::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
 
 use super::address::{address, mailbox};
 use super::cfws;

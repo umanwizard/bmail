@@ -3,7 +3,7 @@ use enum_kinds::EnumKind;
 pub mod address;
 pub mod layout;
 
-use crate::email::btv_new::{ByteStr, ByteString};
+use crate::btv_new::{ByteStr, ByteString};
 use address::{Address, Mailbox};
 
 #[derive(Debug, Clone, EnumKind)]

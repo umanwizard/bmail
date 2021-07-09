@@ -20,7 +20,7 @@ use nom::sequence::tuple;
 use nom::Err;
 use nom::IResult;
 
-use crate::email::btv_new::{ByteStr, ByteString};
+use crate::btv_new::{ByteStr, ByteString};
 
 pub mod address;
 pub mod date_time;

@@ -14,9 +14,8 @@ use nom::Parser;
 use super::header::header_field;
 use super::satisfy_byte;
 
-use crate::email;
-use email::btv_new::Message;
-use email::error::EmailError;
+use crate::btv_new::Message;
+use crate::error::EmailError;
 
 fn is_text(ch: u8) -> bool {
     ch < 128 && ch != b'\r' && ch != b'\n'
