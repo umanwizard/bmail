@@ -9,3 +9,7 @@ edition = "2018"
 nom = "6"
 chrono = "0.4"
 enum-kinds = "0.5"
+
+[[bin]]
+name = "header_layout"
+path = "src/headers/layout.rs"

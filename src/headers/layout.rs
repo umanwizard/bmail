@@ -198,6 +198,7 @@ impl HeaderFieldFormatter {
 // 0!@
 // 0!gmail.com
 
+#[allow(dead_code)]
 fn main() {
     use std::io::stdin;
     use std::io::BufRead;
