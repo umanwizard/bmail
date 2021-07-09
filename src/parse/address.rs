@@ -63,7 +63,7 @@ pub fn angle_addr(input: &[u8]) -> IResult<&[u8], AddrSpec> {
 }
 
 pub fn mailbox(input: &[u8]) -> IResult<&[u8], Mailbox> {
-    let mut name_addr = tuple((opt(phrase), angle_addr));
+    let name_addr = tuple((opt(phrase), angle_addr));
 
     map(
         alt((name_addr, map(addr_spec, |spec| (None, spec)))),

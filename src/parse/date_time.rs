@@ -1,25 +1,25 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::bytes::complete::take_while;
-use nom::bytes::complete::take_while1;
+
+
 use nom::combinator::map;
 use nom::combinator::opt;
-use nom::combinator::recognize;
+
 use nom::combinator::value;
-use nom::error::Error;
-use nom::error::ErrorKind;
-use nom::error::ParseError;
+
+
+
 use nom::multi::fold_many_m_n;
-use nom::multi::many0;
-use nom::multi::many0_count;
-use nom::multi::many1;
-use nom::multi::many1_count;
+
+
+
+
 use nom::sequence::tuple;
-use nom::Err;
+
 use nom::IResult;
 
 use super::super::error::EmailError;
-use super::cfws;
+
 use super::fws;
 use super::satisfy_byte;
 

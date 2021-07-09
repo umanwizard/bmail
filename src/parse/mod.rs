@@ -2,7 +2,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
-use nom::combinator::complete;
+
 use nom::combinator::map;
 use nom::combinator::opt;
 use nom::combinator::recognize;
@@ -11,7 +11,7 @@ use nom::error::Error;
 use nom::error::ErrorKind;
 use nom::error::ParseError;
 use nom::multi::fold_many0;
-use nom::multi::fold_many1;
+
 use nom::multi::many0;
 use nom::multi::many0_count;
 use nom::multi::many1;
@@ -185,7 +185,7 @@ pub fn test_multiword_phrase() {
 
 // TODO - Cow when possible?
 pub fn unstructured(input: &[u8]) -> IResult<&[u8], ByteString> {
-    let (i, mut o) = fold_many0(
+    let (i, o) = fold_many0(
         tuple((opt(fws), satisfy_byte(is_vchar))),
         vec![],
         |mut s, (maybe_fws, ch)| {
