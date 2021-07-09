@@ -1,7 +1,6 @@
 use nom::character::complete::crlf;
 use nom::combinator::consumed;
 
-
 use nom::combinator::recognize;
 use nom::multi::fold_many_m_n;
 use nom::multi::many0;

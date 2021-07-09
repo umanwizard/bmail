@@ -11,21 +11,12 @@ use nom::combinator::opt;
 
 use nom::combinator::value;
 
-
-
-
-
-
-
-
-
 use nom::multi::separated_list1;
 use nom::sequence::terminated;
 
-
 use nom::IResult;
 
-use crate::btv_new::{ByteStr};
+use crate::btv_new::ByteStr;
 use crate::error::EmailError;
 use crate::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
 
