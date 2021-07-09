@@ -106,12 +106,6 @@ fn two_digit(input: &[u8]) -> IResult<&[u8], u8> {
     })(input)
 }
 
-fn four_digit(input: &[u8]) -> IResult<&[u8], u16> {
-    fold_many_m_n(4, 4, satisfy_byte(|ch| ch.is_ascii_digit()), 0, |acc, n| {
-        acc * 10 + (n - b'0') as u16
-    })(input)
-}
-
 fn time(
     date: chrono::NaiveDate,
 ) -> impl Fn(&[u8]) -> IResult<&[u8], chrono::DateTime<chrono::offset::FixedOffset>, EmailError> {
