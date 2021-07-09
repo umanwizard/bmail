@@ -93,6 +93,8 @@ pub fn header_field(input: &[u8]) -> IResult<&[u8], HeaderField, EmailError> {
 
 #[test]
 fn test_from() {
+    use nom::combinator::complete;
+
     let test = r#"From: Brennan Vincent <brennan@umanwizard.com>
 "#
     .replace('\n', "\r\n");

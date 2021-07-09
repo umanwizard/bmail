@@ -177,6 +177,8 @@ pub fn phrase(input: &[u8]) -> IResult<&[u8], Vec<ByteString>> {
 
 #[test]
 pub fn test_multiword_phrase() {
+    use nom::combinator::complete;
+
     let test = b"Brennan Vincent";
 
     let x = complete(phrase)(test).unwrap();
