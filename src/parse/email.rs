@@ -13,7 +13,7 @@ use nom::Parser;
 use super::header::header_field;
 use super::satisfy_byte;
 
-use crate::btv_new::Message;
+use crate::Message;
 use crate::error::EmailError;
 
 fn is_text(ch: u8) -> bool {
@@ -46,10 +46,8 @@ pub fn message(input: &[u8]) -> IResult<&[u8], Message, EmailError> {
         terminated(many0(header_field), crlf),
         nom::Parser::into(consumed(body)),
     ))
-    .map(|(header_fields, (body, body_lines))| Message {
-        header: header_fields,
-        body,
-        body_lines,
+    .map(|(header_fields, (body, body_lines))| {
+        Message::new(header_fields, body, body_lines, input.len())
     })
     .parse(input)
 }

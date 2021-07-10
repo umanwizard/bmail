@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::btv_new::{ByteStr, ByteString};
+use crate::{ByteStr, ByteString};
 
 #[derive(Debug, Clone)]
 pub enum Domain<'a> {

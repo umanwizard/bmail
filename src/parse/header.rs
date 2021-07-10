@@ -16,7 +16,7 @@ use nom::sequence::terminated;
 
 use nom::IResult;
 
-use crate::btv_new::ByteStr;
+use crate::ByteStr;
 use crate::error::EmailError;
 use crate::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
 
@@ -83,11 +83,7 @@ pub fn header_field(input: &[u8]) -> IResult<&[u8], HeaderField, EmailError> {
 
     Ok((
         i,
-        HeaderField {
-            name: ByteStr::from_slice(name),
-            raw_value,
-            inner,
-        },
+        HeaderField::new(ByteStr::from_slice(name), raw_value, inner),
     ))
 }
 

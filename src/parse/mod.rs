@@ -20,14 +20,14 @@ use nom::sequence::tuple;
 use nom::Err;
 use nom::IResult;
 
-use crate::btv_new::{ByteStr, ByteString};
+use crate::{ByteStr, ByteString};
 
 pub mod address;
 pub mod date_time;
 pub mod email;
 pub mod header;
 
-fn is_wsp(ch: u8) -> bool {
+pub(crate) fn is_wsp(ch: u8) -> bool {
     ch == b' ' || ch == b'\t'
 }
 

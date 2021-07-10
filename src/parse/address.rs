@@ -19,7 +19,7 @@ use super::phrase;
 use super::quoted_string;
 use super::satisfy_byte;
 
-use crate::btv_new::{ByteStr, ByteString};
+use crate::{ByteStr, ByteString};
 use crate::headers::address::{AddrSpec, Address, Domain, Group, Mailbox};
 
 fn local_part(input: &[u8]) -> IResult<&[u8], Cow<'_, ByteStr>> {
