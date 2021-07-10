@@ -16,9 +16,9 @@ use nom::sequence::terminated;
 
 use nom::IResult;
 
-use crate::ByteStr;
 use crate::error::EmailError;
 use crate::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
+use crate::ByteStr;
 
 use super::address::{address, mailbox};
 use super::cfws;

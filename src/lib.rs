@@ -54,7 +54,7 @@ impl ToOwned for ByteStr {
     }
 }
 
-use headers::HeaderField;
+pub use headers::HeaderField;
 #[derive(Clone)]
 pub struct Message<'a> {
     header: Vec<HeaderField<'a>>,

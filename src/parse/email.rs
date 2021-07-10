@@ -13,8 +13,8 @@ use nom::Parser;
 use super::header::header_field;
 use super::satisfy_byte;
 
-use crate::Message;
 use crate::error::EmailError;
+use crate::Message;
 
 fn is_text(ch: u8) -> bool {
     ch < 128 && ch != b'\r' && ch != b'\n'

@@ -27,16 +27,17 @@ pub struct HeaderField<'a> {
     name: &'a ByteStr,
     raw_value: &'a [u8],
     inner: HeaderFieldInner<'a>,
-    cached_unfolded_value: Option<Cow<'a, ByteStr>>,
+    unfolded_value: Cow<'a, ByteStr>,
 }
 
 impl<'a> HeaderField<'a> {
     pub fn new(name: &'a ByteStr, raw_value: &'a [u8], inner: HeaderFieldInner<'a>) -> Self {
+        let unfolded_value = Self::compute_unfolded_value(raw_value);
         Self {
             name,
             raw_value,
             inner,
-            cached_unfolded_value: None,
+            unfolded_value,
         }
     }
     pub fn name(&self) -> &ByteStr {
@@ -48,10 +49,9 @@ impl<'a> HeaderField<'a> {
     pub fn inner(&self) -> &HeaderFieldInner<'_> {
         &self.inner
     }
-    pub fn unfolded_value_uncached(&self) -> Cow<'a, ByteStr> {
+    fn compute_unfolded_value(rv: &'a [u8]) -> Cow<'a, ByteStr> {
         // unfolding - remove any \r\n that is immediately
         // followed by WSP
-        let rv = self.raw_value;
         let mut breaks = rv.windows(3).filter_map(|win| {
             if win[0] == b'\r' && win[1] == b'\n' && is_wsp(win[2]) {
                 Some(unsafe { win.as_ptr().offset_from(rv.as_ptr()) } as usize)
@@ -73,10 +73,7 @@ impl<'a> HeaderField<'a> {
             None => Cow::Borrowed(ByteStr::from_slice(rv)),
         }
     }
-    pub fn unfolded_value(&mut self) -> &ByteStr {
-        if self.cached_unfolded_value.is_none() {
-            self.cached_unfolded_value = Some(self.unfolded_value_uncached());
-        }
-        &*self.cached_unfolded_value.as_ref().unwrap()
+    pub fn unfolded_value(&self) -> &ByteStr {
+        &*self.unfolded_value
     }
 }

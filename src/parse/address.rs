@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::crlf;
 use nom::combinator::map;
 use nom::combinator::opt;
 use nom::combinator::value;
@@ -19,8 +18,8 @@ use super::phrase;
 use super::quoted_string;
 use super::satisfy_byte;
 
-use crate::{ByteStr, ByteString};
 use crate::headers::address::{AddrSpec, Address, Domain, Group, Mailbox};
+use crate::{ByteStr, ByteString};
 
 fn local_part(input: &[u8]) -> IResult<&[u8], Cow<'_, ByteStr>> {
     alt((map(dot_atom, Cow::Borrowed), map(quoted_string, Cow::Owned)))(input)
@@ -81,10 +80,12 @@ pub fn group(input: &[u8]) -> IResult<&[u8], Group> {
             tag(b":"),
             opt(alt((
                 separated_list1(tag(b","), mailbox),
-                value(vec![], crlf),
+                value(vec![], cfws),
             ))),
+            tag(b";"),
+            opt(cfws),
         )),
-        |(display_name, _, mailboxes)| {
+        |(display_name, _, mailboxes, _, _)| {
             let mailboxes = mailboxes.unwrap_or(vec![]);
             Group {
                 display_name,
