@@ -32,13 +32,20 @@ pub(crate) fn is_wsp(ch: u8) -> bool {
 }
 
 /// Recognize folding white space - semantically treated as a space
+fn fws_inner(input: &[u8]) -> IResult<&[u8], ()> {
+    alt((
+        value(
+            (),
+            tuple((take_while(is_wsp), tag(b"\r\n"), take_while1(is_wsp))),
+        ),
+        value((), take_while1(is_wsp)),
+    ))(input)
+}
 pub fn fws(input: &[u8]) -> IResult<&[u8], ()> {
-    let (i, _o) = tuple((
-        opt(tuple((take_while(is_wsp), tag(b"\r\n")))),
-        take_while1(is_wsp),
-    ))(input)?;
-
-    Ok((i, ()))
+    //    eprintln!("trying fws: {:?}", input);
+    let ret = fws_inner(input);
+    //    eprintln!("ret: {:?}", ret);
+    ret
 }
 
 fn satisfy_byte<F>(cond: F) -> impl Fn(&[u8]) -> IResult<&[u8], u8>
@@ -171,8 +178,36 @@ fn word(input: &[u8]) -> IResult<&[u8], ByteString> {
 }
 
 // TODO - Cow when possible?
-pub fn phrase(input: &[u8]) -> IResult<&[u8], Vec<ByteString>> {
-    many1(word)(input)
+pub fn phrase(i: &[u8]) -> IResult<&[u8], Vec<ByteString>> {
+    let modern_phrase = many1(word);
+    let obs_phrase = |i| {
+        let (i, first) = word(i)?;
+        let words = vec![first];
+        fold_many0(
+            alt((
+                map(word, Some),
+                map(tag(b"."), |_dot| Some(ByteStr::from_slice(b".").to_owned())),
+                map(cfws, |_| None),
+            )),
+            words,
+            |mut words, maybe_word| {
+                if let Some(word) = maybe_word {
+                    words.push(word);
+                }
+                words
+            },
+        )(i)
+    };
+    alt((obs_phrase, modern_phrase))(i)
+}
+
+#[test]
+fn test_phrase() {
+    let input = b"=?utf-8?Q?Register.ly?=";
+
+    use nom::combinator::all_consuming;
+    let x = all_consuming(phrase)(input).unwrap();
+    println!("{:?}", x);
 }
 
 #[test]

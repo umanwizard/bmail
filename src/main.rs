@@ -7,7 +7,7 @@ fn main() {
     for f in args.skip(1) {
         eprintln!("f: {}", f);
         let data = std::fs::read(f).unwrap();
-        let (_, message) = nom::combinator::complete(message)(&data).unwrap();
-        eprintln!("{:?}", message);
+        let (_, _message) = nom::combinator::complete(message)(&data).unwrap();
+        //        eprintln!("{:?}", message);
     }
 }

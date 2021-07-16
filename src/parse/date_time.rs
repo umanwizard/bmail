@@ -8,12 +8,14 @@ use nom::combinator::value;
 
 use nom::multi::fold_many_m_n;
 
+use nom::sequence::preceded;
 use nom::sequence::tuple;
 
 use nom::IResult;
 
 use super::super::error::EmailError;
 
+use super::cfws;
 use super::fws;
 use super::satisfy_byte;
 
@@ -100,6 +102,48 @@ fn two_digit(input: &[u8]) -> IResult<&[u8], u8> {
     })(input)
 }
 
+fn modern_zone(i: &[u8]) -> IResult<&[u8], chrono::offset::FixedOffset, EmailError> {
+    let (i, (_, pm, hh, mm)) = tuple((fws, alt((tag(b"+"), tag(b"-"))), two_digit, two_digit))(i)
+        .map_err(nom::Err::convert)?;
+    let is_east = match pm {
+        b"+" => true,
+        b"-" => false,
+        _ => unreachable!(),
+    };
+    use chrono::offset::FixedOffset;
+    let offset_seconds = hh as i32 * 3600 + mm as i32 * 60;
+    let tz = if is_east {
+        FixedOffset::east_opt(offset_seconds)
+    } else {
+        FixedOffset::west_opt(offset_seconds)
+    }
+    .ok_or(nom::Err::Error(EmailError::BadTZOffset { is_east, hh, mm }))?;
+    Ok((i, tz))
+}
+
+fn obs_zone(i: &[u8]) -> IResult<&[u8], chrono::offset::FixedOffset, EmailError> {
+    // Doesn't support the one-letter military time zones
+    use chrono::offset::FixedOffset;
+    // The RFC technically doesn't allow whitespace here; see
+    // https://www.rfc-editor.org/errata/eid6639
+    preceded(
+        opt(fws),
+        alt((
+            value(FixedOffset::east(0), alt((tag(b"UT"), tag(b"GMT")))),
+            value(FixedOffset::east(4 * 3600), tag(b"EDT")),
+            value(FixedOffset::east(5 * 3600), alt((tag(b"EST"), tag(b"CDT")))),
+            value(FixedOffset::east(6 * 3600), alt((tag(b"CST"), tag(b"MDT")))),
+            value(FixedOffset::east(7 * 3600), alt((tag(b"MST"), tag(b"PDT")))),
+            value(FixedOffset::east(8 * 3600), tag(b"PST")),
+        )),
+    )(i)
+    .map_err(nom::Err::convert)
+}
+
+fn zone(i: &[u8]) -> IResult<&[u8], chrono::offset::FixedOffset, EmailError> {
+    alt((modern_zone, obs_zone))(i)
+}
+
 fn time(
     date: chrono::NaiveDate,
 ) -> impl Fn(&[u8]) -> IResult<&[u8], chrono::DateTime<chrono::offset::FixedOffset>, EmailError> {
@@ -112,23 +156,7 @@ fn time(
             opt(map(tuple((tag(b":"), two_digit)), |(_, s)| s)),
         ))(i)
         .map_err(nom::Err::convert)?;
-        let (i, (_, pm, hh, mm)) =
-            tuple((fws, alt((tag(b"+"), tag(b"-"))), two_digit, two_digit))(i)
-                .map_err(nom::Err::convert)?;
-        let is_east = match pm {
-            b"+" => true,
-            b"-" => false,
-            _ => unreachable!(),
-        };
-        use chrono::offset::FixedOffset;
-        let offset_seconds = hh as i32 * 3600 + mm as i32 * 60;
-        let tz = if is_east {
-            FixedOffset::east_opt(offset_seconds)
-        } else {
-            FixedOffset::west_opt(offset_seconds)
-        }
-        .ok_or(nom::Err::Error(EmailError::BadTZOffset { is_east, hh, mm }))?;
-
+        let (i, tz) = zone(i)?;
         use chrono::offset::LocalResult;
         let date_time = match tz.from_local_date(&date) {
             LocalResult::None => None,
@@ -153,6 +181,7 @@ pub fn date_time(
     let (i, weekday) = opt(tuple((day_of_week, tag(b","))))(i).map_err(nom::Err::convert)?;
     let (i, date) = date(i)?;
     let (i, time) = time(date)(i)?;
+    let (i, _) = opt(cfws)(i).map_err(nom::Err::convert)?;
     if let Some((weekday, _)) = weekday {
         use chrono::Datelike;
         if time.weekday() != weekday {

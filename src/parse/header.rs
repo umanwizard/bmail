@@ -17,6 +17,7 @@ use nom::sequence::terminated;
 use nom::IResult;
 
 use crate::error::EmailError;
+use crate::headers::address::Address;
 use crate::headers::{HeaderField, HeaderFieldInner, HeaderFieldKind};
 use crate::ByteStr;
 
@@ -42,6 +43,23 @@ fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind> {
     ))(input)
 }
 
+fn optional_address_list(i: &[u8]) -> IResult<&[u8], Vec<Address>> {
+    map(
+        opt(alt((
+            separated_list1(tag(b","), address),
+            value(vec![], cfws),
+        ))),
+        |maybe_list| maybe_list.unwrap_or(vec![]),
+    )(i)
+}
+
+#[test]
+fn test_weird_cc() {
+    let input = b"Bcc: \r\n";
+    use nom::combinator::complete;
+    complete(header_field)(input).unwrap();
+}
+
 fn header_inner(
     hfk: HeaderFieldKind,
 ) -> impl Fn(&[u8]) -> IResult<&[u8], HeaderFieldInner, EmailError> {
@@ -63,16 +81,9 @@ fn header_inner(
         .map_err(nom::Err::convert),
         To => map(separated_list1(tag(b","), address), HeaderFieldInner::To)(i)
             .map_err(nom::Err::convert),
-        Cc => map(separated_list1(tag(b","), address), HeaderFieldInner::Cc)(i)
-            .map_err(nom::Err::convert),
-        Bcc => map(
-            opt(alt((
-                separated_list1(tag(b","), address),
-                value(vec![], cfws),
-            ))),
-            |maybe_list| HeaderFieldInner::Bcc(maybe_list.unwrap_or(vec![])),
-        )(i)
-        .map_err(nom::Err::convert),
+        // [RFC] seen in the wild - empty CC.  Parse it like BCC.
+        Cc => map(optional_address_list, HeaderFieldInner::Cc)(i).map_err(nom::Err::convert),
+        Bcc => map(optional_address_list, HeaderFieldInner::Bcc)(i).map_err(nom::Err::convert),
     }
 }
 
