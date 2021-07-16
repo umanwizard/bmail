@@ -53,10 +53,10 @@ pub fn addr_spec(input: &[u8]) -> IResult<&[u8], AddrSpec> {
     )(input)
 }
 
-pub fn angle_addr(input: &[u8]) -> IResult<&[u8], AddrSpec> {
+pub fn angle_addr(input: &[u8]) -> IResult<&[u8], Option<AddrSpec>> {
     delimited(
         tuple((opt(cfws), tag(b"<"))),
-        addr_spec,
+        opt(addr_spec), // [RFC] WTF? Yep, `Reply-To: Foo <>` seen in the wild!
         tuple((tag(b">"), opt(cfws))),
     )(input)
 }
@@ -65,7 +65,7 @@ pub fn mailbox(input: &[u8]) -> IResult<&[u8], Mailbox> {
     let name_addr = tuple((opt(phrase), angle_addr));
 
     map(
-        alt((name_addr, map(addr_spec, |spec| (None, spec)))),
+        alt((name_addr, map(addr_spec, |spec| (None, Some(spec))))),
         |(display_name, addr_spec)| Mailbox {
             display_name: display_name.unwrap_or(vec![]),
             addr_spec,

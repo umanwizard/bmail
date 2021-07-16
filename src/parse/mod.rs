@@ -2,6 +2,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
+use nom::character::complete::crlf;
 
 use nom::combinator::map;
 use nom::combinator::opt;
@@ -34,13 +35,28 @@ pub(crate) fn is_wsp(ch: u8) -> bool {
 
 /// Recognize folding white space - semantically treated as a space
 fn fws_inner(input: &[u8]) -> IResult<&[u8], ()> {
-    alt((
-        value(
-            (),
-            tuple((take_while(is_wsp), tag(b"\r\n"), take_while1(is_wsp))),
-        ),
+    let modern_fws = alt((
+        value((), tuple((take_while(is_wsp), crlf, take_while1(is_wsp)))),
         value((), take_while1(is_wsp)),
-    ))(input)
+    )); //(input)
+        // [RFC] This seems dubious. The RFC implies that obs-fws _must_
+        // start with at least one whitespace -- but modern FWS doesn't have to.
+        // This precludes multi-line runs of FWS that don't begin with a (horizontal)
+        // whitespace character; for example:
+        // Subject:
+        // ___
+        // ___Hello!
+        //
+        // Is this really what the RFC authors intended?
+    let obs_fws = value(
+        (),
+        tuple((
+            take_while1(is_wsp),
+            many0_count(tuple((crlf, take_while1(is_wsp)))),
+        )),
+    );
+
+    alt((obs_fws, modern_fws))(input)
 }
 pub fn fws(input: &[u8]) -> IResult<&[u8], ()> {
     //    eprintln!("trying fws: {:?}", input);

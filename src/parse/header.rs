@@ -1,6 +1,5 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::bytes::complete::tag_no_case;
 
 use nom::bytes::complete::take_while1;
 use nom::character::complete::crlf;
@@ -30,19 +29,30 @@ use super::unstructured;
 fn is_ftext(ch: u8) -> bool {
     (33 <= ch && ch <= 57) || (59 <= ch && ch <= 126)
 }
+
 fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind> {
     use HeaderFieldKind::*;
-    alt((
-        value(OrigDate, tag_no_case("date")),
-        value(From, tag_no_case("from")),
-        value(Sender, tag_no_case("sender")),
-        value(ReplyTo, tag_no_case("reply-to")),
-        value(To, tag_no_case("to")),
-        value(Cc, tag_no_case("cc")),
-        value(Bcc, tag_no_case("bcc")),
-        value(ContentType, tag_no_case("content-type")),
-        value(Unstructured, take_while1(is_ftext)),
-    ))(input)
+    let (i, val) = take_while1(is_ftext)(input)?;
+    let val = if val.eq_ignore_ascii_case(b"date") {
+        OrigDate
+    } else if val.eq_ignore_ascii_case(b"from") {
+        From
+    } else if val.eq_ignore_ascii_case(b"sender") {
+        Sender
+    } else if val.eq_ignore_ascii_case(b"reply-to") {
+        ReplyTo
+    } else if val.eq_ignore_ascii_case(b"to") {
+        To
+    } else if val.eq_ignore_ascii_case(b"cc") {
+        Cc
+    } else if val.eq_ignore_ascii_case(b"bcc") {
+        Bcc
+    } else if val.eq_ignore_ascii_case(b"content-type") {
+        ContentType
+    } else {
+        Unstructured
+    };
+    Ok((i, val))
 }
 
 fn optional_address_list(i: &[u8]) -> IResult<&[u8], Vec<Address>> {

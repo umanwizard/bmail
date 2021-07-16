@@ -16,7 +16,7 @@ pub struct AddrSpec<'a> {
 #[derive(Debug, Clone)]
 pub struct Mailbox<'a> {
     pub display_name: Vec<ByteString>,
-    pub addr_spec: AddrSpec<'a>,
+    pub addr_spec: Option<AddrSpec<'a>>,
 }
 
 #[derive(Debug, Clone)]
