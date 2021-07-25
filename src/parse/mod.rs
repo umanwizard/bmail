@@ -26,6 +26,7 @@ pub mod address;
 pub mod date_time;
 pub mod email;
 pub mod header;
+pub mod mime;
 
 pub(crate) fn is_wsp(ch: u8) -> bool {
     ch == b' ' || ch == b'\t'
@@ -69,7 +70,7 @@ where
     }
 }
 
-fn is_vchar(ch: u8) -> bool {
+pub fn is_vchar(ch: u8) -> bool {
     0x21 <= ch && ch <= 0x7e
 }
 

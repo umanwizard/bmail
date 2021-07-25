@@ -3,10 +3,12 @@ use std::borrow::Cow;
 
 pub mod address;
 pub mod layout;
+pub mod mime;
 
 use crate::parse::is_wsp;
 use crate::{ByteStr, ByteString};
 use address::{Address, Mailbox};
+use mime::ContentType;
 
 #[derive(Debug, Clone, EnumKind)]
 #[enum_kind(HeaderFieldKind)]
@@ -20,6 +22,7 @@ pub enum HeaderFieldInner<'a> {
     To(Vec<Address<'a>>),
     Cc(Vec<Address<'a>>),
     Bcc(Vec<Address<'a>>),
+    ContentType(ContentType<'a>),
 }
 
 #[derive(Clone, Debug)]

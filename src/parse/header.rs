@@ -24,6 +24,7 @@ use crate::ByteStr;
 use super::address::{address, mailbox};
 use super::cfws;
 use super::date_time::date_time;
+use super::mime::content_type;
 use super::unstructured;
 
 fn is_ftext(ch: u8) -> bool {
@@ -39,6 +40,7 @@ fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind> {
         value(To, tag_no_case("to")),
         value(Cc, tag_no_case("cc")),
         value(Bcc, tag_no_case("bcc")),
+        value(ContentType, tag_no_case("content-type")),
         value(Unstructured, take_while1(is_ftext)),
     ))(input)
 }
@@ -84,6 +86,9 @@ fn header_inner(
         // [RFC] seen in the wild - empty CC.  Parse it like BCC.
         Cc => map(optional_address_list, HeaderFieldInner::Cc)(i).map_err(nom::Err::convert),
         Bcc => map(optional_address_list, HeaderFieldInner::Bcc)(i).map_err(nom::Err::convert),
+        ContentType => {
+            map(content_type, HeaderFieldInner::ContentType)(i).map_err(nom::Err::convert)
+        }
     }
 }
 
