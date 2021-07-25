@@ -17,9 +17,11 @@ use nom::sequence::preceded;
 use nom::sequence::tuple;
 use nom::IResult;
 
+// [RFC]: I just made this up. Is it specified anywhere?
 fn is_content_type_ch(ch: u8) -> bool {
     (b'a' <= ch && ch <= b'z')
         || (b'A' <= ch && ch <= b'Z')
+        || (b'0' <= ch && ch <= b'9')
         || ch == b'-'
         || ch == b'.'
         || ch == b'_'
