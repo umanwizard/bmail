@@ -60,7 +60,10 @@ pub(crate) fn content_type(input: &[u8]) -> IResult<&[u8], ContentType<'_>> {
             tuple((opt(cfws), tag(b";"))),
             preceded(opt(cfws), parameter),
         )),
-        opt(cfws),
+        tuple((
+            opt(tag(b";")), // [RFC] seen in the wild: trailing semicolon
+            opt(cfws),
+        )),
     ))(input)?;
 
     Ok((
