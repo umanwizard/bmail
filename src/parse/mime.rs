@@ -11,7 +11,7 @@ use nom::bytes::complete::tag;
 use nom::bytes::complete::take_while1;
 use nom::combinator::map;
 use nom::combinator::opt;
-use nom::multi::many1;
+use nom::multi::many0;
 use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::sequence::tuple;
@@ -56,7 +56,7 @@ pub(crate) fn content_type(input: &[u8]) -> IResult<&[u8], ContentType<'_>> {
         preceded(opt(cfws), r#type),
         preceded(opt(cfws), tag(b"/")),
         preceded(opt(cfws), subtype),
-        many1(preceded(
+        many0(preceded(
             tuple((opt(cfws), tag(b";"))),
             preceded(opt(cfws), parameter),
         )),
