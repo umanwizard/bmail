@@ -58,6 +58,7 @@ pub use headers::HeaderField;
 #[derive(Clone)]
 pub struct Message<'a> {
     header: Vec<HeaderField<'a>>,
+    content_type: Option<usize>, // index of Content-Type field in header
     body: &'a [u8],
     body_lines: Vec<&'a [u8]>,
     size: usize,
@@ -66,12 +67,14 @@ pub struct Message<'a> {
 impl<'a> Message<'a> {
     pub(crate) fn new(
         header: Vec<HeaderField<'a>>,
+        content_type: Option<usize>,
         body: &'a [u8],
         body_lines: Vec<&'a [u8]>,
         size: usize,
     ) -> Self {
         Self {
             header,
+            content_type,
             body,
             body_lines,
             size,

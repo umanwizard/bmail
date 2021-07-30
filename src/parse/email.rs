@@ -2,11 +2,10 @@ use nom::character::complete::crlf;
 use nom::combinator::consumed;
 
 use nom::combinator::recognize;
+use nom::multi::fold_many0;
 use nom::multi::fold_many_m_n;
-use nom::multi::many0;
 use nom::multi::separated_list0;
 use nom::sequence::terminated;
-use nom::sequence::tuple;
 use nom::IResult;
 use nom::Parser;
 
@@ -14,6 +13,8 @@ use super::header::header_field;
 use super::satisfy_byte;
 
 use crate::error::EmailError;
+use crate::headers::mime::ContentType;
+use crate::headers::HeaderFieldInner;
 use crate::Message;
 
 fn is_text(ch: u8) -> bool {
@@ -30,24 +31,46 @@ fn text998(input: &[u8]) -> IResult<&[u8], &[u8]> {
     ))(input)
 }
 
-pub fn body(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
-    separated_list0(crlf, text998)
-        .map(|mut v| {
+pub fn body<'a>(
+    ct: Option<&ContentType>,
+) -> impl Parser<&'a [u8], Vec<&'a [u8]>, nom::error::Error<&'a [u8]>> {
+    match ct {
+        None => separated_list0(crlf, text998).map(|mut v| {
             if v.last() == Some(&&b""[..]) {
                 v.pop();
             }
             v
-        })
-        .parse(input)
+        }),
+        Some(_ct) => todo!(),
+    }
 }
 
 pub fn message(input: &[u8]) -> IResult<&[u8], Message, EmailError> {
-    tuple((
-        terminated(many0(header_field), crlf),
-        nom::Parser::into(consumed(body)),
+    let (i, (hfs, ctype_idx, _i)) = terminated(
+        fold_many0(
+            header_field,
+            (vec![], None, 0),
+            |(mut hfs, ctype_idx, i), hf| {
+                let ctype_idx = ctype_idx.or_else(|| {
+                    if let HeaderFieldInner::ContentType(_) = &hf.inner() {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+                hfs.push(hf);
+                (hfs, ctype_idx, i + 1)
+            },
+        ),
+        crlf,
+    )(input)?;
+    let ct = ctype_idx.map(|ctype_idx| match &hfs[ctype_idx].inner() {
+        HeaderFieldInner::ContentType(ct) => ct,
+        _ => unreachable!(),
+    });
+    let (i, (body, body_lines)) = nom::Parser::into(consumed(body(ct))).parse(i)?;
+    Ok((
+        i,
+        Message::new(hfs, ctype_idx, body, body_lines, input.len()),
     ))
-    .map(|(header_fields, (body, body_lines))| {
-        Message::new(header_fields, body, body_lines, input.len())
-    })
-    .parse(input)
 }
