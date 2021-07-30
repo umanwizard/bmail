@@ -24,6 +24,7 @@ pub enum EmailError<'a> {
         date_time: chrono::DateTime<chrono::offset::FixedOffset>,
         weekday: chrono::Weekday,
     },
+    ContentTypeWithoutBoundary,
 }
 
 impl<'a> From<NomErr<'a>> for EmailError<'a> {

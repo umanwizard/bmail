@@ -49,7 +49,7 @@ impl<'a> HeaderField<'a> {
     pub fn raw_value(&self) -> &[u8] {
         self.raw_value
     }
-    pub fn inner(&self) -> &HeaderFieldInner<'_> {
+    pub fn inner(&self) -> &HeaderFieldInner<'a> {
         &self.inner
     }
     fn compute_unfolded_value(rv: &'a [u8]) -> Cow<'a, ByteStr> {

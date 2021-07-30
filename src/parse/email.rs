@@ -15,6 +15,7 @@ use super::satisfy_byte;
 use crate::error::EmailError;
 use crate::headers::mime::ContentType;
 use crate::headers::HeaderFieldInner;
+use crate::ByteStr;
 use crate::Message;
 
 fn is_text(ch: u8) -> bool {
@@ -31,22 +32,47 @@ fn text998(input: &[u8]) -> IResult<&[u8], &[u8]> {
     ))(input)
 }
 
-pub fn body<'a>(
-    ct: Option<&ContentType>,
-) -> impl Parser<&'a [u8], Vec<&'a [u8]>, nom::error::Error<&'a [u8]>> {
-    match ct {
-        None => separated_list0(crlf, text998).map(|mut v| {
-            if v.last() == Some(&&b""[..]) {
-                v.pop();
-            }
-            v
-        }),
-        Some(_ct) => todo!(),
+fn simple_body<'a>() -> impl Parser<&'a [u8], Vec<&'a [u8]>, nom::error::Error<&'a [u8]>> {
+    separated_list0(crlf, text998).map(|mut v| {
+        if v.last() == Some(&&b""[..]) {
+            v.pop();
+        }
+        v
+    })
+}
+
+fn multipart_body<'a, 'b>(
+    boundary: &'b ByteStr,
+) -> impl Parser<&'a [u8], Vec<&'a [u8]>, nom::error::Error<&'a [u8]>> + 'b
+where
+    'a: 'b,
+{
+    separated_list0(crlf, text998).map(move |mut v| {
+        &boundary;
+        if v.last() == Some(&&b""[..]) {
+            v.pop();
+        }
+        v
+    })
+}
+
+pub fn body<'a, 'b>(
+    boundary: Option<&'b ByteStr>,
+) -> impl Parser<&'a [u8], Vec<&'a [u8]>, EmailError<'a>> + 'b
+where
+    'a: 'b,
+{
+    move |input: &'a [u8]| -> IResult<&'a [u8], Vec<&'a [u8]>, EmailError<'a>> {
+        match boundary {
+            Some(boundary) => nom::Parser::into(multipart_body(boundary)).parse(input),
+            _ => nom::Parser::into(simple_body()).parse(input),
+        }
     }
 }
 
-pub fn message(input: &[u8]) -> IResult<&[u8], Message, EmailError> {
-    let (i, (hfs, ctype_idx, _i)) = terminated(
+pub fn message<'a>(input: &'a [u8]) -> IResult<&'a [u8], Message<'a>, EmailError<'a>> {
+    use crate::HeaderField;
+    let (i, (hfs, ctype_idx, _i)): (_, (Vec<HeaderField<'a>>, _, _)) = terminated(
         fold_many0(
             header_field,
             (vec![], None, 0),
@@ -64,11 +90,50 @@ pub fn message(input: &[u8]) -> IResult<&[u8], Message, EmailError> {
         ),
         crlf,
     )(input)?;
-    let ct = ctype_idx.map(|ctype_idx| match &hfs[ctype_idx].inner() {
-        HeaderFieldInner::ContentType(ct) => ct,
-        _ => unreachable!(),
-    });
-    let (i, (body, body_lines)) = nom::Parser::into(consumed(body(ct))).parse(i)?;
+    let boundary: Option<&ByteStr> = match ctype_idx {
+        Some(ctype_idx) => match hfs[ctype_idx].inner() {
+            HeaderFieldInner::ContentType(ct) => {
+                let ContentType {
+                    parameters, r#type, ..
+                }: &ContentType<'a> = ct;
+
+                let parameters: &Vec<(&'a ByteStr, Cow<'a, ByteStr>)> = parameters;
+
+                if r#type.0.eq_ignore_ascii_case(b"multipart") {
+                    Some(
+                        match parameters
+                            .iter()
+                            .filter_map(|(k, v)| {
+                                let v: &Cow<'a, ByteStr> = v;
+                                let x: Option<&ByteStr> = if k.0.eq_ignore_ascii_case(b"boundary") {
+                                    Some(&**v)
+                                } else {
+                                    None
+                                };
+                                x
+                            })
+                            .next()
+                        {
+                            Some(boundary) => boundary,
+                            None => {
+                                return Err(nom::Err::Error(EmailError::ContentTypeWithoutBoundary))
+                            }
+                        },
+                    )
+                } else {
+                    None
+                }
+            }
+            _ => unreachable!(),
+        },
+        None => None,
+    };
+
+    let (i, (body, body_lines)): (&'a [u8], (&'a [u8], Vec<&'a [u8]>)) =
+        match consumed(body(boundary)).parse(i) {
+            Ok(zzz) => zzz,
+            Err(e) => panic!(), //return Err(nom::Err::convert(e)),
+        };
     Ok((
         i,
         Message::new(hfs, ctype_idx, body, body_lines, input.len()),
