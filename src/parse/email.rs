@@ -90,27 +90,21 @@ pub fn message<'a>(input: &'a [u8]) -> IResult<&'a [u8], Message<'a>, EmailError
         ),
         crlf,
     )(input)?;
-    let boundary: Option<&ByteStr> = match ctype_idx {
+    let boundary = match ctype_idx {
         Some(ctype_idx) => match hfs[ctype_idx].inner() {
-            HeaderFieldInner::ContentType(ct) => {
-                let ContentType {
-                    parameters, r#type, ..
-                }: &ContentType<'a> = ct;
-
-                let parameters: &Vec<(&'a ByteStr, Cow<'a, ByteStr>)> = parameters;
-
+            HeaderFieldInner::ContentType(ContentType {
+                r#type, parameters, ..
+            }) => {
                 if r#type.0.eq_ignore_ascii_case(b"multipart") {
                     Some(
                         match parameters
                             .iter()
                             .filter_map(|(k, v)| {
-                                let v: &Cow<'a, ByteStr> = v;
-                                let x: Option<&ByteStr> = if k.0.eq_ignore_ascii_case(b"boundary") {
+                                if k.0.eq_ignore_ascii_case(b"boundary") {
                                     Some(&**v)
                                 } else {
                                     None
-                                };
-                                x
+                                }
                             })
                             .next()
                         {
@@ -129,11 +123,7 @@ pub fn message<'a>(input: &'a [u8]) -> IResult<&'a [u8], Message<'a>, EmailError
         None => None,
     };
 
-    let (i, (body, body_lines)): (&'a [u8], (&'a [u8], Vec<&'a [u8]>)) =
-        match consumed(body(boundary)).parse(i) {
-            Ok(zzz) => zzz,
-            Err(e) => panic!(), //return Err(nom::Err::convert(e)),
-        };
+    let (i, (body, body_lines)) = nom::Parser::into(consumed(body(boundary))).parse(i)?;
     Ok((
         i,
         Message::new(hfs, ctype_idx, body, body_lines, input.len()),
