@@ -54,13 +54,26 @@ impl ToOwned for ByteStr {
     }
 }
 
+#[derive(Clone)]
+pub enum Body<'a> {
+    Simple {
+        data: &'a [u8],
+        lines: Vec<&'a [u8]>,
+    },
+    Multipart {
+        preamble: &'a [u8],
+        parts: Vec<Message<'a>>,
+        epilogue: &'a [u8],
+        // content_subtype: &'a [u8],
+    },
+}
+
 pub use headers::HeaderField;
 #[derive(Clone)]
 pub struct Message<'a> {
     header: Vec<HeaderField<'a>>,
     content_type: Option<usize>, // index of Content-Type field in header
-    body: &'a [u8],
-    body_lines: Vec<&'a [u8]>,
+    body: Body<'a>,
     size: usize,
 }
 
@@ -68,15 +81,13 @@ impl<'a> Message<'a> {
     pub(crate) fn new(
         header: Vec<HeaderField<'a>>,
         content_type: Option<usize>,
-        body: &'a [u8],
-        body_lines: Vec<&'a [u8]>,
+        body: Body<'a>,
         size: usize,
     ) -> Self {
         Self {
             header,
             content_type,
             body,
-            body_lines,
             size,
         }
     }
@@ -85,11 +96,8 @@ impl<'a> Message<'a> {
         &self.header
     }
 
-    pub fn body(&self) -> &[u8] {
-        self.body
-    }
-    pub fn body_lines(&self) -> &[&'a [u8]] {
-        &self.body_lines
+    pub fn body(&self) -> &Body<'a> {
+        &self.body
     }
     pub fn size(&self) -> usize {
         self.size
@@ -101,9 +109,9 @@ impl<'a> std::fmt::Debug for Message<'a> {
         for hf in self.header.iter() {
             writeln!(f, "{:?}:{:?}", hf.name(), hf.inner())?;
         }
-        for line in self.body_lines.iter() {
-            writeln!(f, "LINE: {}", String::from_utf8_lossy(line))?;
-        }
+//        for line in self.body_lines.iter() {
+//            writeln!(f, "LINE: {}", String::from_utf8_lossy(line))?;
+//        }
         Ok(())
     }
 }

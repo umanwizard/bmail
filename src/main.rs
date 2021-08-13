@@ -10,7 +10,7 @@ fn main() {
     for f in args.skip(1) {
         println!("{}", f);
         let data = std::fs::read(f).unwrap();
-        let (_, message) = nom::combinator::complete(message)(&data).unwrap();
+        let (_, message) = nom::combinator::complete(message())(&data).unwrap();
         for hf in message.header().iter() {
             if hf.name().0.eq_ignore_ascii_case(b"content-type") {
                 let ContentType {
