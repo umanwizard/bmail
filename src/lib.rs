@@ -104,14 +104,45 @@ impl<'a> Message<'a> {
     }
 }
 
+impl<'a> std::fmt::Debug for Body<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Body::Simple { data: _, lines } => {
+                writeln!(f, "SIMPLE BODY")?;
+                for line in lines.iter() {
+                    writeln!(f, "LINE: {}", String::from_utf8_lossy(line))?;
+                }
+            }
+            Body::Multipart {
+                preamble,
+                parts,
+                epilogue,
+            } => {
+                writeln!(f, "MULTIPART BODY WITH {} PARTS", parts.len())?;
+                if !preamble.is_empty() {
+                    writeln!(f, "PREAMBLE")?;
+                    write!(f, "{}", String::from_utf8_lossy(preamble))?;
+                }
+                for (i, p) in parts.iter().enumerate() {
+                    writeln!(f, "PART {}", i)?;
+                    write!(f, "{:?}", p)?;
+                }
+                if !epilogue.is_empty() {
+                    writeln!(f, "EPILOGUE")?;
+                    write!(f, "{}", String::from_utf8_lossy(epilogue))?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<'a> std::fmt::Debug for Message<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         for hf in self.header.iter() {
             writeln!(f, "{:?}:{:?}", hf.name(), hf.inner())?;
         }
-//        for line in self.body_lines.iter() {
-//            writeln!(f, "LINE: {}", String::from_utf8_lossy(line))?;
-//        }
+        write!(f, "\n{:?}", self.body)?;
         Ok(())
     }
 }

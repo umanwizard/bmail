@@ -1,10 +1,8 @@
 use nom::character::complete::crlf;
-use nom::combinator::consumed;
 
 use nom::combinator::recognize;
 use nom::multi::fold_many0;
 use nom::multi::fold_many_m_n;
-use nom::multi::separated_list0;
 use nom::sequence::terminated;
 use nom::IResult;
 use nom::Parser;
@@ -138,7 +136,7 @@ where
 
     let epilogue_bound = outer_boundary.map(|ob| {
         let mut buf = String::new();
-        buf.push_str("\r\n^");
+        buf.push_str("\r\n^--");
         regex_syntax::escape_into(unsafe { std::str::from_utf8_unchecked(&ob.0) }, &mut buf);
         buf.push_str(r"(--)?\r$\n");
         RegexBuilder::new(&buf).multi_line(true).build().unwrap()
