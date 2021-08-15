@@ -1,8 +1,10 @@
-type NomErr<'a> = nom::error::Error<&'a [u8]>;
+use crate::headers::mime::ContentDecodeError;
+
+type NomVerboseError<'a> = nom::error::VerboseError<&'a [u8]>;
 
 #[derive(Debug)]
 pub enum EmailError<'a> {
-    Parse(NomErr<'a>, Option<Box<EmailError<'a>>>),
+    Parse(NomVerboseError<'a>, Option<Box<EmailError<'a>>>),
     BadDate {
         y: u16,
         m: chrono::Month,
@@ -25,19 +27,31 @@ pub enum EmailError<'a> {
         weekday: chrono::Weekday,
     },
     ContentTypeWithoutBoundary,
+    MultipartWithNontrivialCte,
+    BodyDecode(ContentDecodeError),
+    LineTooLong,
 }
 
-impl<'a> From<NomErr<'a>> for EmailError<'a> {
-    fn from(e: NomErr<'a>) -> Self {
+impl<'a> From<NomVerboseError<'a>> for EmailError<'a> {
+    fn from(e: NomVerboseError<'a>) -> Self {
         Self::Parse(e, None)
+    }
+}
+
+impl From<ContentDecodeError> for EmailError<'static> {
+    fn from(e: ContentDecodeError) -> Self {
+        Self::BodyDecode(e)
     }
 }
 
 impl<'a> nom::error::ParseError<&'a [u8]> for EmailError<'a> {
     fn from_error_kind(input: &'a [u8], code: nom::error::ErrorKind) -> Self {
-        Self::Parse(NomErr { input, code }, None)
+        Self::Parse(NomVerboseError::from_error_kind(input, code), None)
     }
     fn append(input: &'a [u8], code: nom::error::ErrorKind, other: Self) -> Self {
-        Self::Parse(NomErr { input, code }, Some(Box::new(other)))
+        Self::Parse(
+            NomVerboseError::from_error_kind(input, code),
+            Some(Box::new(other)),
+        )
     }
 }

@@ -5,6 +5,7 @@ pub mod address;
 pub mod layout;
 pub mod mime;
 
+use crate::headers::mime::ContentTransferEncoding;
 use crate::parse::is_wsp;
 use crate::{ByteStr, ByteString};
 use address::{Address, Mailbox};
@@ -23,6 +24,7 @@ pub enum HeaderFieldInner<'a> {
     Cc(Vec<Address<'a>>),
     Bcc(Vec<Address<'a>>),
     ContentType(ContentType<'a>),
+    ContentTransferEncoding(ContentTransferEncoding),
 }
 
 #[derive(Clone, Debug)]

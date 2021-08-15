@@ -3,8 +3,9 @@ use bmail::headers::mime::ContentType;
 use bmail::headers::HeaderFieldInner;
 use bmail::parse::email::message;
 
-use nom::error::Error as NomError;
+use nom::error::VerboseError as NomVerboseError;
 use nom::Err as NomErr;
+use nom::Parser;
 
 use std::env;
 
@@ -14,10 +15,10 @@ fn main() {
     for f in args.skip(1) {
         println!("{}", f);
         let data = std::fs::read(f).unwrap();
-        let (_, message) = match nom::combinator::complete(message())(&data) {
+        let (_, message) = match message().parse(&data) {
             Ok(ok) => ok,
-            Err(NomErr::Error(EmailError::Parse(NomError { input, .. }, _))) => {
-                panic!("Error at: {}", String::from_utf8_lossy(input));
+            Err(NomErr::Error(e)) => {
+                panic!("Error: {:?}", e);
             }
             Err(e) => panic!("{:?}", e),
         };

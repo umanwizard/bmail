@@ -56,10 +56,8 @@ impl ToOwned for ByteStr {
 
 #[derive(Clone)]
 pub enum Body<'a> {
-    Simple {
-        data: &'a [u8],
-        lines: Vec<&'a [u8]>,
-    },
+    SimpleText(String),
+    SimpleBinary(Vec<u8>),
     Multipart {
         preamble: &'a [u8],
         parts: Vec<Message<'a>>,
@@ -107,11 +105,12 @@ impl<'a> Message<'a> {
 impl<'a> std::fmt::Debug for Body<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
-            Body::Simple { data: _, lines } => {
-                writeln!(f, "SIMPLE BODY")?;
-                for line in lines.iter() {
-                    writeln!(f, "LINE: {}", String::from_utf8_lossy(line))?;
-                }
+            Body::SimpleText(text) => {
+                writeln!(f, "TEXT BODY")?;
+                write!(f, "{}", text)?;
+            }
+            Body::SimpleBinary(_) => {
+                writeln!(f, "BINARY BODY (omitted)")?;
             }
             Body::Multipart {
                 preamble,

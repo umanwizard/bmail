@@ -5,6 +5,7 @@ use nom::bytes::complete::tag;
 use nom::combinator::map;
 use nom::combinator::opt;
 use nom::combinator::value;
+use nom::error::VerboseError;
 use nom::multi::many0;
 use nom::multi::separated_list1;
 use nom::sequence::delimited;
@@ -21,14 +22,14 @@ use super::satisfy_byte;
 use crate::headers::address::{AddrSpec, Address, Domain, Group, Mailbox};
 use crate::{ByteStr, ByteString};
 
-fn local_part(input: &[u8]) -> IResult<&[u8], Cow<'_, ByteStr>> {
+fn local_part(input: &[u8]) -> IResult<&[u8], Cow<'_, ByteStr>, VerboseError<&[u8]>> {
     alt((map(dot_atom, Cow::Borrowed), map(quoted_string, Cow::Owned)))(input)
 }
 
 fn is_dtext(ch: u8) -> bool {
     (33 <= ch && ch <= 90) || (94 <= ch && ch <= 126)
 }
-fn domain_literal(input: &[u8]) -> IResult<&[u8], ByteString> {
+fn domain_literal(input: &[u8]) -> IResult<&[u8], ByteString, VerboseError<&[u8]>> {
     map(
         delimited(
             tuple((cfws, tag(b"["))),
@@ -39,21 +40,21 @@ fn domain_literal(input: &[u8]) -> IResult<&[u8], ByteString> {
     )(input)
 }
 
-pub fn domain(input: &[u8]) -> IResult<&[u8], Domain> {
+pub fn domain(input: &[u8]) -> IResult<&[u8], Domain, VerboseError<&[u8]>> {
     alt((
         map(dot_atom, Domain::Name),
         map(domain_literal, Domain::Literal),
     ))(input)
 }
 
-pub fn addr_spec(input: &[u8]) -> IResult<&[u8], AddrSpec> {
+pub fn addr_spec(input: &[u8]) -> IResult<&[u8], AddrSpec, VerboseError<&[u8]>> {
     map(
         tuple((local_part, tag(b"@"), domain)),
         |(local_part, _, domain)| AddrSpec { local_part, domain },
     )(input)
 }
 
-pub fn angle_addr(input: &[u8]) -> IResult<&[u8], Option<AddrSpec>> {
+pub fn angle_addr(input: &[u8]) -> IResult<&[u8], Option<AddrSpec>, VerboseError<&[u8]>> {
     delimited(
         tuple((opt(cfws), tag(b"<"))),
         opt(addr_spec), // [RFC] WTF? Yep, `Reply-To: Foo <>` seen in the wild!
@@ -61,7 +62,7 @@ pub fn angle_addr(input: &[u8]) -> IResult<&[u8], Option<AddrSpec>> {
     )(input)
 }
 
-pub fn mailbox(input: &[u8]) -> IResult<&[u8], Mailbox> {
+pub fn mailbox(input: &[u8]) -> IResult<&[u8], Mailbox, VerboseError<&[u8]>> {
     let name_addr = tuple((opt(phrase), angle_addr));
 
     map(
@@ -73,7 +74,7 @@ pub fn mailbox(input: &[u8]) -> IResult<&[u8], Mailbox> {
     )(input)
 }
 
-pub fn group(input: &[u8]) -> IResult<&[u8], Group> {
+pub fn group(input: &[u8]) -> IResult<&[u8], Group, VerboseError<&[u8]>> {
     map(
         tuple((
             phrase,
@@ -95,6 +96,6 @@ pub fn group(input: &[u8]) -> IResult<&[u8], Group> {
     )(input)
 }
 
-pub fn address(input: &[u8]) -> IResult<&[u8], Address> {
+pub fn address(input: &[u8]) -> IResult<&[u8], Address, VerboseError<&[u8]>> {
     alt((map(mailbox, Address::Mailbox), map(group, Address::Group)))(input)
 }

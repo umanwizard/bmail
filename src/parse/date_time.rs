@@ -11,6 +11,7 @@ use nom::multi::fold_many_m_n;
 use nom::sequence::preceded;
 use nom::sequence::tuple;
 
+use nom::error::VerboseError;
 use nom::IResult;
 
 use super::super::error::EmailError;
@@ -19,7 +20,7 @@ use super::cfws;
 use super::fws;
 use super::satisfy_byte;
 
-fn day_of_week(input: &[u8]) -> IResult<&[u8], chrono::Weekday> {
+fn day_of_week(input: &[u8]) -> IResult<&[u8], chrono::Weekday, VerboseError<&[u8]>> {
     use chrono::Weekday;
     map(
         tuple((
@@ -38,7 +39,7 @@ fn day_of_week(input: &[u8]) -> IResult<&[u8], chrono::Weekday> {
     )(input)
 }
 
-fn month(input: &[u8]) -> IResult<&[u8], chrono::Month> {
+fn month(input: &[u8]) -> IResult<&[u8], chrono::Month, VerboseError<&[u8]>> {
     use chrono::Month;
     alt((
         value(Month::January, tag(b"Jan")),
@@ -56,7 +57,7 @@ fn month(input: &[u8]) -> IResult<&[u8], chrono::Month> {
     ))(input)
 }
 
-fn day(input: &[u8]) -> IResult<&[u8], u8> {
+fn day(input: &[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>> {
     map(
         tuple((
             opt(fws),
@@ -69,7 +70,7 @@ fn day(input: &[u8]) -> IResult<&[u8], u8> {
     )(input)
 }
 
-fn year(input: &[u8]) -> IResult<&[u8], u16> {
+fn year(input: &[u8]) -> IResult<&[u8], u16, VerboseError<&[u8]>> {
     map(
         tuple((
             fws,
@@ -96,7 +97,7 @@ fn date(input: &[u8]) -> IResult<&[u8], chrono::NaiveDate, EmailError> {
     Ok((i, date))
 }
 
-fn two_digit(input: &[u8]) -> IResult<&[u8], u8> {
+fn two_digit(input: &[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>> {
     fold_many_m_n(2, 2, satisfy_byte(|ch| ch.is_ascii_digit()), 0, |acc, n| {
         acc * 10 + (n - b'0')
     })(input)

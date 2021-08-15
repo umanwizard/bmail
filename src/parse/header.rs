@@ -13,7 +13,8 @@ use nom::combinator::value;
 use nom::multi::separated_list1;
 use nom::sequence::terminated;
 
-use nom::IResult;
+use nom::error::VerboseError;
+use nom::{IResult, Parser};
 
 use crate::error::EmailError;
 use crate::headers::address::Address;
@@ -23,14 +24,14 @@ use crate::ByteStr;
 use super::address::{address, mailbox};
 use super::cfws;
 use super::date_time::date_time;
-use super::mime::content_type;
+use super::mime::{content_transfer_encoding, content_type};
 use super::unstructured;
 
 fn is_ftext(ch: u8) -> bool {
     (33 <= ch && ch <= 57) || (59 <= ch && ch <= 126)
 }
 
-fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind> {
+fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind, VerboseError<&[u8]>> {
     use HeaderFieldKind::*;
     let (i, val) = take_while1(is_ftext)(input)?;
     let val = if val.eq_ignore_ascii_case(b"date") {
@@ -49,13 +50,15 @@ fn header_name(input: &[u8]) -> IResult<&[u8], HeaderFieldKind> {
         Bcc
     } else if val.eq_ignore_ascii_case(b"content-type") {
         ContentType
+    } else if val.eq_ignore_ascii_case(b"content-transfer-encoding") {
+        ContentTransferEncoding
     } else {
         Unstructured
     };
     Ok((i, val))
 }
 
-fn optional_address_list(i: &[u8]) -> IResult<&[u8], Vec<Address>> {
+fn optional_address_list(i: &[u8]) -> IResult<&[u8], Vec<Address>, VerboseError<&[u8]>> {
     map(
         opt(alt((
             separated_list1(tag(b","), address),
@@ -72,16 +75,27 @@ fn test_weird_cc() {
     complete(header_field)(input).unwrap();
 }
 
+fn header_inner_permissive<'a>(
+    hfk: HeaderFieldKind,
+) -> impl Parser<&'a [u8], HeaderFieldInner<'a>, EmailError<'a>> {
+    alt((
+        header_inner(hfk),
+        map(
+            nom::Parser::into(unstructured),
+            HeaderFieldInner::Unstructured,
+        ),
+    ))
+}
+
 fn header_inner(
     hfk: HeaderFieldKind,
 ) -> impl Fn(&[u8]) -> IResult<&[u8], HeaderFieldInner, EmailError> {
     use HeaderFieldKind::*;
 
     move |i| match hfk {
-        Unstructured => map(unstructured, |cooked| {
-            HeaderFieldInner::Unstructured(cooked)
-        })(i)
-        .map_err(nom::Err::convert),
+        Unstructured => {
+            map(unstructured, HeaderFieldInner::Unstructured)(i).map_err(nom::Err::convert)
+        }
         OrigDate => map(date_time, |dt| HeaderFieldInner::OrigDate(dt))(i),
         From => map(separated_list1(tag(b","), mailbox), HeaderFieldInner::From)(i)
             .map_err(nom::Err::convert),
@@ -99,13 +113,18 @@ fn header_inner(
         ContentType => {
             map(content_type, HeaderFieldInner::ContentType)(i).map_err(nom::Err::convert)
         }
+        ContentTransferEncoding => map(
+            content_transfer_encoding,
+            HeaderFieldInner::ContentTransferEncoding,
+        )(i)
+        .map_err(nom::Err::convert),
     }
 }
 
 pub fn header_field(input: &[u8]) -> IResult<&[u8], HeaderField, EmailError> {
     let (i, (name, hfk)) =
         terminated(consumed(header_name), tag(b":"))(input).map_err(nom::Err::convert)?;
-    let (i, (raw_value, inner)) = terminated(consumed(header_inner(hfk)), crlf)(i)?;
+    let (i, (raw_value, inner)) = terminated(consumed(header_inner_permissive(hfk)), crlf)(i)?;
 
     Ok((
         i,

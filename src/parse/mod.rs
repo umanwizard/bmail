@@ -11,6 +11,7 @@ use nom::combinator::value;
 use nom::error::Error;
 use nom::error::ErrorKind;
 use nom::error::ParseError;
+use nom::error::VerboseError;
 use nom::multi::fold_many0;
 
 use nom::multi::many0;
@@ -34,7 +35,7 @@ pub(crate) fn is_wsp(ch: u8) -> bool {
 }
 
 /// Recognize folding white space - semantically treated as a space
-fn fws_inner(input: &[u8]) -> IResult<&[u8], ()> {
+fn fws_inner(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     let modern_fws = alt((
         value((), tuple((take_while(is_wsp), crlf, take_while1(is_wsp)))),
         value((), take_while1(is_wsp)),
@@ -58,26 +59,29 @@ fn fws_inner(input: &[u8]) -> IResult<&[u8], ()> {
 
     alt((obs_fws, modern_fws))(input)
 }
-pub fn fws(input: &[u8]) -> IResult<&[u8], ()> {
+pub fn fws(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     //    eprintln!("trying fws: {:?}", input);
     let ret = fws_inner(input);
     //    eprintln!("ret: {:?}", ret);
     ret
 }
 
-fn satisfy_byte<F>(cond: F) -> impl Fn(&[u8]) -> IResult<&[u8], u8>
+fn satisfy_byte<F>(cond: F) -> impl Fn(&[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>>
 where
     F: Fn(u8) -> bool,
 {
     move |input| {
         if input.is_empty() {
-            Err(Err::Error(Error::from_error_kind(input, ErrorKind::Eof)))
+            Err(Err::Error(VerboseError::from_error_kind(
+                input,
+                ErrorKind::Eof,
+            )))
         } else {
             let ch = input[0];
             if cond(ch) {
                 Ok((&input[1..], input[0]))
             } else {
-                Err(Err::Error(Error::from_error_kind(
+                Err(Err::Error(VerboseError::from_error_kind(
                     input,
                     ErrorKind::Satisfy,
                 )))
@@ -94,7 +98,7 @@ fn is_quotable(ch: u8) -> bool {
     is_vchar(ch) || is_wsp(ch)
 }
 
-pub fn quoted_pair(input: &[u8]) -> IResult<&[u8], u8> {
+pub fn quoted_pair(input: &[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>> {
     let (i, (_backslash, ch)) = tuple((tag(b"\\"), satisfy_byte(is_quotable)))(input)?;
     Ok((i, ch))
 }
@@ -103,7 +107,7 @@ fn is_ctext(ch: u8) -> bool {
     (33 <= ch && ch <= 39) || (42 <= ch && ch <= 91) || (93 <= ch && ch <= 126)
 }
 
-fn ccontent(input: &[u8]) -> IResult<&[u8], ()> {
+fn ccontent(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     alt((
         value((), satisfy_byte(is_ctext)),
         value((), quoted_pair),
@@ -111,7 +115,7 @@ fn ccontent(input: &[u8]) -> IResult<&[u8], ()> {
     ))(input)
 }
 
-fn comment(input: &[u8]) -> IResult<&[u8], ()> {
+fn comment(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     value(
         (),
         tuple((
@@ -131,14 +135,14 @@ pub fn is_special(ch: u8) -> bool {
     b"()<>[]:;@\\,.\"".iter().any(|ch2| *ch2 == ch)
 }
 
-pub fn atom(input: &[u8]) -> IResult<&[u8], &ByteStr> {
+pub fn atom(input: &[u8]) -> IResult<&[u8], &ByteStr, VerboseError<&[u8]>> {
     map(
         tuple((opt(cfws), take_while1(is_atext), opt(cfws))),
         |(_, the_atom, _)| ByteStr::from_slice(the_atom),
     )(input)
 }
 
-fn dot_atom_text(input: &[u8]) -> IResult<&[u8], &ByteStr> {
+fn dot_atom_text(input: &[u8]) -> IResult<&[u8], &ByteStr, VerboseError<&[u8]>> {
     // dot-atom-text   =   1*atext *("." 1*atext)
     map(
         recognize(tuple((
@@ -149,14 +153,14 @@ fn dot_atom_text(input: &[u8]) -> IResult<&[u8], &ByteStr> {
     )(input)
 }
 
-pub fn dot_atom(input: &[u8]) -> IResult<&[u8], &ByteStr> {
+pub fn dot_atom(input: &[u8]) -> IResult<&[u8], &ByteStr, VerboseError<&[u8]>> {
     map(
         tuple((opt(cfws), dot_atom_text, opt(cfws))),
         |(_, the_atom, _)| the_atom,
     )(input)
 }
 
-pub fn cfws(input: &[u8]) -> IResult<&[u8], ()> {
+pub fn cfws(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     alt((
         value(
             (),
@@ -170,12 +174,12 @@ fn is_qtext(ch: u8) -> bool {
     ch == 33 || (35 <= ch && ch <= 91) || (93 <= ch && ch <= 126)
 }
 
-fn qcontent(input: &[u8]) -> IResult<&[u8], u8> {
+fn qcontent(input: &[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>> {
     alt((satisfy_byte(is_qtext), quoted_pair))(input)
 }
 
 // TODO - Cow here when possible, rather than always allocating?
-pub fn quoted_string(input: &[u8]) -> IResult<&[u8], ByteString> {
+pub fn quoted_string(input: &[u8]) -> IResult<&[u8], ByteString, VerboseError<&[u8]>> {
     map(
         tuple((
             opt(cfws),
@@ -190,12 +194,12 @@ pub fn quoted_string(input: &[u8]) -> IResult<&[u8], ByteString> {
 }
 
 // TODO - Cow when possible?
-fn word(input: &[u8]) -> IResult<&[u8], ByteString> {
+fn word(input: &[u8]) -> IResult<&[u8], ByteString, VerboseError<&[u8]>> {
     alt((map(atom, ToOwned::to_owned), quoted_string))(input)
 }
 
 // TODO - Cow when possible?
-pub fn phrase(i: &[u8]) -> IResult<&[u8], Vec<ByteString>> {
+pub fn phrase(i: &[u8]) -> IResult<&[u8], Vec<ByteString>, VerboseError<&[u8]>> {
     let modern_phrase = many1(word);
     let obs_phrase = |i| {
         let (i, first) = word(i)?;
@@ -238,7 +242,7 @@ pub fn test_multiword_phrase() {
 }
 
 // TODO - Cow when possible?
-pub fn unstructured(input: &[u8]) -> IResult<&[u8], ByteString> {
+pub fn unstructured(input: &[u8]) -> IResult<&[u8], ByteString, VerboseError<&[u8]>> {
     let (i, o) = fold_many0(
         tuple((opt(fws), satisfy_byte(is_vchar))),
         vec![],
