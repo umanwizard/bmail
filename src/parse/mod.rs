@@ -21,6 +21,7 @@ use nom::multi::many1_count;
 use nom::sequence::tuple;
 use nom::Err;
 use nom::IResult;
+use nom::Parser;
 
 use crate::{ByteStr, ByteString};
 
@@ -34,7 +35,6 @@ pub(crate) fn is_wsp(ch: u8) -> bool {
     ch == b' ' || ch == b'\t'
 }
 
-/// Recognize folding white space - semantically treated as a space
 fn fws_inner(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
     let modern_fws = alt((
         value((), tuple((take_while(is_wsp), crlf, take_while1(is_wsp)))),
@@ -59,11 +59,21 @@ fn fws_inner(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
 
     alt((obs_fws, modern_fws))(input)
 }
+/// Recognize folding white space - semantically the newlines are ignored;
+/// if you care about the semantic value, call fws_semantic.
 pub fn fws(input: &[u8]) -> IResult<&[u8], (), VerboseError<&[u8]>> {
-    //    eprintln!("trying fws: {:?}", input);
-    let ret = fws_inner(input);
-    //    eprintln!("ret: {:?}", ret);
-    ret
+    fws_inner(input)
+}
+
+pub fn fws_semantic(input: &[u8]) -> IResult<&[u8], Vec<u8>, VerboseError<&[u8]>> {
+    let (i, recognized) = recognize(fws_inner).parse(input)?;
+    let mut ret = vec![];
+    for ch in recognized.iter().cloned() {
+        if ch != b'\r' && ch != b'\n' {
+            ret.push(ch);
+        }
+    }
+    Ok((i, ret))
 }
 
 fn satisfy_byte<F>(cond: F) -> impl Fn(&[u8]) -> IResult<&[u8], u8, VerboseError<&[u8]>>
@@ -184,7 +194,17 @@ pub fn quoted_string(input: &[u8]) -> IResult<&[u8], ByteString, VerboseError<&[
         tuple((
             opt(cfws),
             tag(b"\""),
-            many0(map(tuple((opt(fws), qcontent)), |(_, ch)| ch)),
+            fold_many0(
+                tuple((opt(fws_semantic), qcontent)),
+                vec![],
+                |mut s, (maybe_fws, ch)| {
+                    if let Some(fws) = maybe_fws {
+                        s.extend_from_slice(&fws);
+                    }
+                    s.push(ch);
+                    s
+                },
+            ),
             opt(fws),
             tag(b"\""),
             opt(cfws),

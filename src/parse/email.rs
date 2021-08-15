@@ -62,7 +62,7 @@ fn cte_decode<'a>(
                 nom::Parser::into(consumed(preceded(text998, opt(crlf)))).parse(i)?;
             i = i2;
             if crlf.is_none() && !i.is_empty() {
-                eprint!(
+                eprintln!(
                     "Line too long ({}): {}",
                     line.len(),
                     String::from_utf8_lossy(line)
@@ -111,27 +111,40 @@ struct MultipartBodyResult<'a> {
     epilogue: &'a [u8],
 }
 
+#[test]
+fn test_weird_regex() {
+    let reg = RegexBuilder::new(r"\r\n^--b1_49145819f7efd258fd36c55109003c25(--)?(\r$\n|$)")
+        .multi_line(true)
+        .build()
+        .unwrap();
+    let haystack = "Content-Type: text/html\r\nContent-Transfer-Encoding: base64\r\n--b1_49145819f7efd258fd36c55109003c25--";
+
+    assert!(reg.captures(haystack.as_bytes()).is_some());
+}
+
 fn multipart_body<'a, 'b>(
     boundary: &'b str,
 ) -> impl Parser<&'a [u8], MultipartBodyResult<'a>, EmailError<'a>> + 'b
 where
     'a: 'b,
 {
-    println!("Boundary: {}", boundary);
+    //eprintln!("Boundary: {}", boundary);
     let preamble_bound = {
         let mut buf = String::new();
         buf.push_str("^--");
         regex_syntax::escape_into(boundary, &mut buf);
-        buf.push_str(r"\r$\n");
-        println!("preamble_bound: {}", buf);
+        buf.push_str(r"[ \t]*\r$\n");
+        //eprintln!("preamble_bound: {}", buf);
         RegexBuilder::new(&buf).multi_line(true).build().unwrap()
     };
 
     let inner_bound = {
         let mut buf = String::new();
-        buf.push_str("\r\n^--");
+        buf.push_str(r"\r\n^--");
         regex_syntax::escape_into(boundary, &mut buf);
-        buf.push_str(r"(--)?\r$\n");
+        buf.push_str(r"(--)?[ \t]*(\r$\n|$)");
+        //buf.push_str(r"(--)?\r$\n");
+        //eprintln!("inner_bound: {}", buf);
         RegexBuilder::new(&buf).multi_line(true).build().unwrap()
     };
 
@@ -146,6 +159,11 @@ where
         let mut i = &input[main_start..];
 
         loop {
+            //            eprint!(
+            //                "Searching for: {:?}\nin: {:?}",
+            //                inner_bound,
+            //                String::from_utf8_lossy(i)
+            //            );
             let (inner_end, next_start, is_done) = match inner_bound.captures(i) {
                 None => todo!(),
                 Some(c) => {
@@ -163,6 +181,7 @@ where
         }
         let epilogue = i;
         i = &i[i.len()..];
+        //eprintln!("Finishing boundary: {}", boundary);
         Ok((
             i,
             MultipartBodyResult {
@@ -296,7 +315,9 @@ where
         let mime_ctl = match (&boundary, charset, cte, is_text) {
             (Some(boundary), _, _, true) => unreachable!(),
             (Some(boundary), _, Some(cte), false) if !cte.is_trivial() => {
-                return Err(nom::Err::Error(EmailError::MultipartWithNontrivialCte));
+                // TODO - warn here? It appears in the wild.
+                // return Err(nom::Err::Error(EmailError::MultipartWithNontrivialCte));
+                MimeParseControl::Multipart { boundary }
             }
             (Some(boundary), _, _, false) => MimeParseControl::Multipart { boundary },
             (None, charset, encoding, true) => MimeParseControl::SimpleText { encoding, charset },
