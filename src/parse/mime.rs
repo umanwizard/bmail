@@ -30,6 +30,7 @@ fn is_content_type_ch(ch: u8) -> bool {
         || ch == b'-'
         || ch == b'.'
         || ch == b'_'
+        || ch == b'+' // Seen in the wild: text/x-c++src
 }
 
 fn r#type(input: &[u8]) -> IResult<&[u8], &ByteStr, VerboseError<&[u8]>> {
@@ -86,11 +87,14 @@ pub(crate) fn content_type(input: &[u8]) -> IResult<&[u8], ContentType<'_>, Verb
         fold_many0(
             preceded(
                 tuple((opt(cfws), tag(b";"))),
-                preceded(opt(cfws), parameter),
+                opt(preceded(opt(cfws), parameter)),
             ),
             HashMap::new(),
-            |mut params, (k, v)| {
-                params.insert(k, v);
+            |mut params, maybe| {
+                // This is `opt` because stuff like "Content-Type: text/plain;;" has been seen...
+                if let Some((k, v)) = maybe {
+                    params.insert(k, v);
+                }
                 params
             },
         ),

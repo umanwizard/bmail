@@ -7,12 +7,14 @@ use nom::combinator::all_consuming;
 use nom::combinator::consumed;
 use nom::combinator::opt;
 use nom::combinator::recognize;
+use nom::branch::alt;
 use nom::error::VerboseError;
 use nom::multi::fold_many0;
 use nom::multi::fold_many_m_n;
 use nom::sequence::preceded;
 use nom::sequence::terminated;
 use nom::sequence::tuple;
+use nom::bytes::complete::tag;
 use nom::IResult;
 use nom::Parser;
 use regex::bytes::RegexBuilder;
@@ -32,9 +34,13 @@ fn is_non_crlf(ch: u8) -> bool {
 }
 
 fn text998(input: &[u8]) -> IResult<&[u8], &[u8], VerboseError<&[u8]>> {
-    recognize(fold_many_m_n(
-        0,
-        998,
+    recognize(
+//    fold_many_m_n(
+//        0,
+//        998,
+    // TODO [RFC] - We should make the maximum line length configurable, or at
+    // least warn when it is over 998.
+    fold_many0(
         satisfy_byte(is_non_crlf),
         (),
         |(), _ch| (),
@@ -47,6 +53,10 @@ struct SimpleBodyResult<'a> {
     pub lines: Vec<&'a [u8]>,
 }
 
+// [RFC] Sadly, random extra ^M's seem pretty common on dubious mails in the wild.
+fn weak_crlf(input: &[u8]) -> IResult<&[u8], &[u8], VerboseError<&[u8]>> {
+    alt((tag(b"\r\n"), tag(b"\r"), tag(b"\n")))(input)
+}
 fn cte_decode<'a>(
     encoding: Option<ContentTransferEncoding>,
 ) -> impl Parser<&'a [u8], Vec<u8>, EmailError<'a>> {
@@ -59,7 +69,7 @@ fn cte_decode<'a>(
         };
         while !i.is_empty() {
             let (i2, (line, crlf)) =
-                nom::Parser::into(consumed(preceded(text998, opt(crlf)))).parse(i)?;
+                nom::Parser::into(consumed(preceded(text998, opt(weak_crlf)))).parse(i)?;
             i = i2;
             if crlf.is_none() && !i.is_empty() {
                 eprintln!(
